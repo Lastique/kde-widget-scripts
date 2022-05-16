@@ -48,12 +48,12 @@ format_mem_size()
 {
     local -i value=$(($1 * 10))
     local unit="KiB"
-    if [ "$value" -gt 1024 ]
+    if [ "$value" -gt 10240 ]
     then
         value=$((value / 1024))
         unit="MiB"
     fi
-    if [ "$value" -gt 1024 ]
+    if [ "$value" -gt 10240 ]
     then
         value=$((value / 1024))
         unit="GiB"
