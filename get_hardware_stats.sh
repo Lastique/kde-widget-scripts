@@ -28,11 +28,11 @@ get_cpu_freq()
     do
         local file0="/sys/devices/system/cpu/cpu${core}/cpufreq/scaling_cur_freq"
         local file1="/sys/devices/system/cpu/cpu$((core+1))/cpufreq/scaling_cur_freq"
-        if ! read -r freq0 < "$file0"
+        if [ ! -f "$file0" ] || ! read -r freq0 < "$file0"
         then
             break
         fi
-        if ! read -r freq1 < "$file1"
+        if [ ! -f "$file1" ] || ! read -r freq1 < "$file1" 2>/dev/null
         then
             break
         fi
@@ -52,15 +52,19 @@ get_cpu_freq()
 
 get_gpu_stats()
 {
-    local nvidia_smi_output=$(nvidia-smi --query-gpu=temperature.gpu,clocks.current.sm --format=csv,noheader,nounits)
+    local nvidia_smi_output="$(nvidia-smi --query-gpu=temperature.gpu,clocks.current.sm --format=csv,noheader,nounits)"
 
     GPU_TEMP="${nvidia_smi_output%%,*}"
     GPU_TEMP="${GPU_TEMP#"${GPU_TEMP%%[![:space:]]*}"}"
     GPU_TEMP="${GPU_TEMP%"${GPU_TEMP##*[![:space:]]}"}"
 
-    GPU_FREQ="${nvidia_smi_output##*,}"
-    GPU_FREQ="${GPU_FREQ#"${GPU_FREQ%%[![:space:]]*}"}"
-    GPU_FREQ="${GPU_FREQ%"${GPU_FREQ##*[![:space:]]}"}"
+    local freq="${nvidia_smi_output##*,}"
+    freq="${freq#"${freq%%[![:space:]]*}"}"
+    freq="${freq%"${freq##*[![:space:]]}"}"
+    if [[ "$freq" == +([0-9]) ]]
+    then
+        GPU_FREQ="$freq"
+    fi
 }
 
 get_cpu_temp
