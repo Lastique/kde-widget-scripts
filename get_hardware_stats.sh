@@ -8,17 +8,10 @@ declare -i GPU_FREQ=0
 get_cpu_temp()
 {
     local file
-    local line
-    local temp
+    local -i temp
     for file in /sys/devices/platform/coretemp.0/hwmon/hwmon*/temp1_input
     do
-        while IFS= read -r line; do
-            if [ -z "$temp" ]
-            then
-                temp="$line"
-                break
-            fi
-        done < "$file"
+        read -r temp < "$file"
         break
     done
     CPU_TEMP="${temp::-3}"
@@ -26,29 +19,35 @@ get_cpu_temp()
 
 get_cpu_freq()
 {
-    local core
-    local line
-    local freq=0
-    local accum_freq=0
-    local core_count=0
+    local -i core
+    local -i freq0=0
+    local -i freq1=0
+    local -i accum_freq=0
+    local -i core_count=0
     for ((core=0; 1; core+=2))
     do
-        local file="/sys/devices/system/cpu/cpu${core}/cpufreq/scaling_cur_freq"
-        if [ ! -f "$file" ]
+        local file0="/sys/devices/system/cpu/cpu${core}/cpufreq/scaling_cur_freq"
+        local file1="/sys/devices/system/cpu/cpu$((core+1))/cpufreq/scaling_cur_freq"
+        if ! read -r freq0 < "$file0"
         then
             break
         fi
-        while IFS= read -r line; do
-            accum_freq=$((accum_freq+line))
-            ((++core_count))
+        if ! read -r freq1 < "$file1"
+        then
             break
-        done < "$file"
+        fi
+        if [ "$freq0" -lt "$freq1" ]
+        then
+            freq0="$freq1"
+        fi
+        accum_freq=$((accum_freq+freq0))
+        ((++core_count))
     done
     if [ "$core_count" -gt 0 ]
     then
-        freq=$((accum_freq/core_count))
+        freq0=$((accum_freq/core_count))
     fi
-    CPU_FREQ="${freq::-3}"
+    CPU_FREQ="${freq0::-3}"
 }
 
 get_gpu_stats()
