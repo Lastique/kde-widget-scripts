@@ -24,6 +24,8 @@ get_cpu_freq()
     local -i freq1=0
     local -i accum_freq=0
     local -i core_count=0
+    local -i max_core_freq=0
+    local -a core_freqs
     for ((core=0; 1; core+=2))
     do
         local file0="/sys/devices/system/cpu/cpu${core}/cpufreq/scaling_cur_freq"
@@ -40,9 +42,25 @@ get_cpu_freq()
         then
             freq0="$freq1"
         fi
-        accum_freq=$((accum_freq+freq0))
-        ((++core_count))
+        core_freqs+=("$freq0")
+        if [ "$max_core_freq" -lt "$freq0" ]
+        then
+            max_core_freq="$freq0"
+        fi
     done
+
+    # Discard core frequencies that are (nearly) idle. This allows to display the average frequency
+    # of the cores that are currently under load, which is more meaningful.
+    freq1=$((max_core_freq*2/3))
+    for freq0 in "${core_freqs[@]}"
+    do
+        if [ "$freq0" -ge "$freq1" ]
+        then
+            accum_freq=$((accum_freq+freq0))
+            ((++core_count))
+        fi
+    done
+
     if [ "$core_count" -gt 0 ]
     then
         freq0=$((accum_freq/core_count))
