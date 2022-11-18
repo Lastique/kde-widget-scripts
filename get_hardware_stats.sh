@@ -51,7 +51,7 @@ get_cpu_freq()
 
     # Discard core frequencies that are (nearly) idle. This allows to display the average frequency
     # of the cores that are currently under load, which is more meaningful.
-    freq1=$((max_core_freq*2/3))
+    freq1=$((max_core_freq*3/4))
     for freq0 in "${core_freqs[@]}"
     do
         if [ "$freq0" -ge "$freq1" ]
