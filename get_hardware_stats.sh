@@ -20,52 +20,76 @@ get_cpu_temp()
 get_cpu_freq()
 {
     local -i core
-    local -i freq0=0
-    local -i freq1=0
+    local siblings=""
+    local -i cur_freq=0
+    local -i base_freq=0
     local -i accum_freq=0
     local -i core_count=0
     local -i max_core_freq=0
-    local -a core_freqs
-    for ((core=0; 1; core+=2))
+    local -A core_freqs_above_base
+    local -A core_freqs_below_base
+    local -A base_freqs
+    for ((core=0; 1; core+=1))
     do
-        local file0="/sys/devices/system/cpu/cpu${core}/cpufreq/scaling_cur_freq"
-        local file1="/sys/devices/system/cpu/cpu$((core+1))/cpufreq/scaling_cur_freq"
-        if [ ! -f "$file0" ] || ! read -r freq0 < "$file0"
+        local siblings_file="/sys/devices/system/cpu/cpu${core}/topology/thread_siblings"
+        local base_freq_file="/sys/devices/system/cpu/cpu${core}/cpufreq/base_frequency"
+        local cur_freq_file="/sys/devices/system/cpu/cpu${core}/cpufreq/scaling_cur_freq"
+
+        if [ ! -f "$siblings_file" ] || ! read -r siblings < "$siblings_file" 2>/dev/null
         then
             break
         fi
-        if [ ! -f "$file1" ] || ! read -r freq1 < "$file1" 2>/dev/null
+        if [ ! -f "$base_freq_file" ] || ! read -r base_freq < "$base_freq_file" 2>/dev/null
         then
             break
         fi
-        if [ "$freq0" -lt "$freq1" ]
+        if [ ! -f "$cur_freq_file" ] || ! read -r cur_freq < "$cur_freq_file" 2>/dev/null
         then
-            freq0="$freq1"
+            break
         fi
-        core_freqs+=("$freq0")
-        if [ "$max_core_freq" -lt "$freq0" ]
+
+        if [ "$cur_freq" -gt "$base_freq" ]
         then
-            max_core_freq="$freq0"
+            if [ -z "${core_freqs_above_base["$siblings"]}" ]
+            then
+                core_freqs_above_base["$siblings"]="$cur_freq"
+            elif [ "$cur_freq" -gt "${core_freqs_above_base["$siblings"]}" ]
+            then
+                core_freqs_above_base["$siblings"]="$cur_freq"
+            fi
+        else
+            if [ -z "${core_freqs_below_base["$siblings"]}" ]
+            then
+                core_freqs_below_base["$siblings"]="$cur_freq"
+            elif [ "$cur_freq" -gt "${core_freqs_below_base["$siblings"]}" ]
+            then
+                core_freqs_below_base["$siblings"]="$cur_freq"
+            fi
         fi
     done
 
-    # Discard core frequencies that are (nearly) idle. This allows to display the average frequency
-    # of the cores that are currently under load, which is more meaningful.
-    freq1=$((max_core_freq*3/4))
-    for freq0 in "${core_freqs[@]}"
-    do
-        if [ "$freq0" -ge "$freq1" ]
-        then
-            accum_freq=$((accum_freq+freq0))
+    # Average frequencies either above or below base frequencies. This allows to display the average frequency
+    # of either all cores that are currently under load, if there are ones, or otherwise of all cores that are idle.
+    if [ "${#core_freqs_above_base[@]}" -gt 0 ]
+    then
+        for cur_freq in "${core_freqs_above_base[@]}"
+        do
+            accum_freq=$((accum_freq+cur_freq))
             ((++core_count))
-        fi
-    done
+        done
+    else
+        for cur_freq in "${core_freqs_below_base[@]}"
+        do
+            accum_freq=$((accum_freq+cur_freq))
+            ((++core_count))
+        done
+    fi
 
     if [ "$core_count" -gt 0 ]
     then
-        freq0=$((accum_freq/core_count))
+        cur_freq=$((accum_freq/core_count))
     fi
-    CPU_FREQ="${freq0::-3}"
+    CPU_FREQ="${cur_freq::-3}"
 }
 
 get_gpu_stats()
