@@ -20,7 +20,10 @@ get_cpu_temp()
 get_cpu_freq()
 {
     local -i core
+    local file=""
     local siblings=""
+    local -i min_freq=0
+    local -i max_freq=0
     local -i cur_freq=0
     local -i base_freq=0
     local -i accum_freq=0
@@ -28,22 +31,38 @@ get_cpu_freq()
     local -i max_core_freq=0
     local -A core_freqs_above_base
     local -A core_freqs_below_base
-    local -A base_freqs
+
     for ((core=0; 1; core+=1))
     do
-        local siblings_file="/sys/devices/system/cpu/cpu${core}/topology/thread_siblings"
-        local base_freq_file="/sys/devices/system/cpu/cpu${core}/cpufreq/base_frequency"
-        local cur_freq_file="/sys/devices/system/cpu/cpu${core}/cpufreq/scaling_cur_freq"
+        file="/sys/devices/system/cpu/cpu${core}/topology/thread_siblings"
+        if [ ! -f "$file" ] || ! read -r siblings < "$file" 2>/dev/null
+        then
+            break
+        fi
 
-        if [ ! -f "$siblings_file" ] || ! read -r siblings < "$siblings_file" 2>/dev/null
+        file="/sys/devices/system/cpu/cpu${core}/cpufreq/base_frequency"
+        if [ ! -f "$file" ]
+        then
+            file="/sys/devices/system/cpu/cpu${core}/cpufreq/cpuinfo_min_freq"
+            if [ ! -f "$file" ] || ! read -r min_freq < "$file" 2>/dev/null
+            then
+                break
+            fi
+
+            file="/sys/devices/system/cpu/cpu${core}/cpufreq/cpuinfo_max_freq"
+            if [ ! -f "$file" ] || ! read -r max_freq < "$file" 2>/dev/null
+            then
+                break
+            fi
+
+            base_freq=$((min_freq+(max_freq-min_freq)/2))
+        elif ! read -r base_freq < "$file" 2>/dev/null
         then
             break
         fi
-        if [ ! -f "$base_freq_file" ] || ! read -r base_freq < "$base_freq_file" 2>/dev/null
-        then
-            break
-        fi
-        if [ ! -f "$cur_freq_file" ] || ! read -r cur_freq < "$cur_freq_file" 2>/dev/null
+
+        file="/sys/devices/system/cpu/cpu${core}/cpufreq/scaling_cur_freq"
+        if [ ! -f "$file" ] || ! read -r cur_freq < "$file" 2>/dev/null
         then
             break
         fi
@@ -88,8 +107,10 @@ get_cpu_freq()
     if [ "$core_count" -gt 0 ]
     then
         cur_freq=$((accum_freq/core_count))
+        CPU_FREQ="${cur_freq::-3}"
+    else
+        CPU_FREQ=0
     fi
-    CPU_FREQ="${cur_freq::-3}"
 }
 
 get_gpu_stats()
