@@ -67,7 +67,7 @@ get_cpu_freq()
             break
         fi
 
-        if [ "$cur_freq" -gt "$base_freq" ]
+        if [ "$cur_freq" -ge "$((base_freq+100000))" ]
         then
             if [ -z "${core_freqs_above_base["$siblings"]}" ]
             then
