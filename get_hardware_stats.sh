@@ -5,6 +5,12 @@ declare -i CPU_FREQ=0
 declare -i GPU_TEMP=0
 declare -i GPU_FREQ=0
 
+declare -i ENABLE_GPU_STATS=0
+if [ "$1" = "-g" ]
+then
+    ENABLE_GPU_STATS=1
+fi
+
 get_cpu_temp()
 {
     local file
@@ -132,6 +138,13 @@ get_gpu_stats()
 
 get_cpu_temp
 get_cpu_freq
-get_gpu_stats
+if [ "$ENABLE_GPU_STATS" -ne 0 ]
+then
+    get_gpu_stats
+fi
 
-printf "CPU: ${CPU_TEMP}°, ${CPU_FREQ} MHz\nGPU: ${GPU_TEMP}°, ${GPU_FREQ} MHz\n"
+printf "CPU: ${CPU_TEMP}°, ${CPU_FREQ} MHz\n"
+if [ "$ENABLE_GPU_STATS" -ne 0 ]
+then
+    printf "GPU: ${GPU_TEMP}°, ${GPU_FREQ} MHz\n"
+fi
